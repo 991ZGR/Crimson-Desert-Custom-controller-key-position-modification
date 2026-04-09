@@ -1,0 +1,69 @@
+[基础移动操作]
+Run=Key_Dash<repeat>
+Run=Key_Run<press>
+Run=Key_Run_Once<downonce>
+Run=Key_Run_Press<press>(0.2)
+Run=Key_Run_Once_AccByInput<downonce>
+Jump=Key_Jump<downonce>
+Jump=Key_Jump_Press<press>
+Jump=Key_Jump_ing<downonce>
+Jump=Key_Jump_ing<downonce>
+Jump=Key_Jump_Release<release>{0.2}
+Jump=Key_ClimbStart<downonce>
+Jump=Key_ClimbIng<press>
+Glide=Key_GlideStart<press>(0.2)
+Glide=Key_GlideEnd<downonce>
+Slide=Key_Slide<release>{0.2}
+Hang=Key_HangOnFloor<downonce>
+Crouch=Key_Crouch<release>{0.2}
+Crouch=Key_Crouch_Press<press>(0.2)
+
+[技能操作]
+The Power of Law=Key_Skill_11<press>
+The Power of Law=Key_Skill_11_DownOnce<downonce>
+The Power of Law=Key_Skill_11_Start<press>(0.2)
+Jin Fa(劲法)=Key_Skill_16<press>
+Jin Fa(劲法)=Key_Skill_16_Start<press>
+Jin Fa(劲法)=Key_Skill_16_Combo<press>
+
+[目标锁定操作]
+Toggle LockOn=ToggleLockOn<doubleclick>
+Toggle LockOn=LockOnPress<press>
+Toggle LockOn=ReleaseLockOn<release>
+Toggle LockOn=UpdateLockOn<press>
+Toggle Hard LockOn=ToggleHardLockOn<downonce>
+
+[战斗基础操作]
+Guard=Key_Guard_Start<press>
+Guard=Key_Guard<press>
+Guard=Key_Guard_DownOnce<downonce>
+Guard=Key_Guard_Release<release>
+Guard=Key_JustGuard<downonce>
+Evade=Key_Evade<press>
+Evade=Key_FastEvade<downonce>
+Evade=Key_Roll<press>
+Evade=Key_Roll_Repeat<downonce>
+Evade=Key_JustEvade<downonce>
+Normal attack=Key_Skill_12_Start<press>
+Normal attack=Key_Skill_12<press>
+Normal attack=WeaponQuickSlotPress<press>
+Normal attack=Key_JustGuard_NorAttack<downonce>
+Normal attack=Key_NorAttack<downonce>
+Normal attack=Key_NorAttack_DownOnce<downonce>
+Normal attack=Key_NorAttack_Release<release>
+Normal attack=Key_NorAttack_PressStart<press>(0.2)
+HardAttack=Key_JustGuard_HardAttack<downonce>
+HardAttack=Key_HardAttack<downonce>
+HardAttack=Key_HardAttack_DownOnce<downonce>
+KickAttack=Key_FistAttack<release>{0.2}
+KickAttack=Key_KickAttack<press>
+KickAttack=Key_KickAttack_Start<downonce>
+KickAttack=Key_KickAttack_PressStart<press>(0.2)
+KickAttack=Key_KickAttack_DownOnce<downonce>
+KickAttack=Key_Skill_14_Start<press>(0.2)
+KickAttack=Key_Skill_14<press>
+bow and arrow=SubWeaponQuickSlotPress<press>
+bow and arrow=Key_SubAttack_PressStart<press>
+bow and arrow=Key_SubAttack_Start<downonce>
+bow and arrow=Key_JustGuard_SubAttack<downonce>
+bow and arrow=Key_SubAttack<press>
