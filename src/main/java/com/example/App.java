@@ -1,802 +1,1176 @@
 package com.example;
 
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
 import java.util.HashMap;
-import javax.swing.*;
-import javax.swing.border.Border;
-import javax.swing.table.DefaultTableModel;
-import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.MissingResourceException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.PropertyResourceBundle;
-import java.util.ResourceBundle;
+import java.util.stream.Stream;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.io.IOException;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JTable;
+import javax.swing.JList;
+import javax.swing.JScrollPane;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+import javax.swing.JComponent;
+import javax.swing.BoxLayout;
+import javax.swing.Box;
+import javax.swing.JSplitPane;
+import javax.swing.border.TitledBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableColumnModel;
+import javax.swing.AbstractCellEditor;
+import javax.swing.ListSelectionModel;
+import javax.swing.ScrollPaneConstants;
+import javax.swing.BorderFactory;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.BorderLayout;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class App extends JFrame {
-    public static class KeyMapping {
-        private String sourceName; // 源代码名称（XML里的Input Name）
-        private String displayName; // 多语言显示名（cn.txt/en.txt）
-        private String rawKey; // 原始键位
-        private String rawMethod; // 原始触发方式
-        private String modifiedKey; // 修改键位
-        private String modifiedMethod; // 修改触发方式
-        private String inputNameLine; // Input标签行
-        private String gamePadLine; // GamePad标签行
+    // ===================== 语言配置核心 =====================
+    private boolean isChinese = true; // 默认中文
+    // 中文TXT路径
+    private final String TXT_PATH_CN = "cn_same_name_method _partial.txt";
+    // 英文TXT路径
+    private final String TXT_PATH_EN = "cn_same_name_method _partial_EN.txt";
+    // 界面文本资源
+    private final Map<String, String> TEXT_CN = new HashMap<>();
+    private final Map<String, String> TEXT_EN = new HashMap<>();
+    // 操作列表多语言配置
+    private final List<String> MOVE_OPS_CN = Arrays.asList("奔跑", "跳跃", "滑翔", "滑行", "悬挂", "蹲下");
+    private final List<String> MOVE_OPS_EN = Arrays.asList("Run", "Jump", "Glide", "Slide", "Hang", "Crouch");
+    private final List<String> BATTLE_OPS_CN = Arrays.asList("格挡", "闪避", "轻攻击", "重攻击", "搏击", "远程攻击", "软锁", "硬锁");
+    private final List<String> BATTLE_OPS_EN = Arrays.asList("Guard", "Evade", "Normal attack", "HardAttack",
+            "KickAttack", "bow and arrow", "Toggle LockOn", "Toggle Hard LockOn");
+    private final List<String> SKILL_OPS_CN = Arrays.asList("劲法", "法则之力");
+    private final List<String> SKILL_OPS_EN = Arrays.asList("Jin Fa(劲法)", "The Power of Law");
 
-        public KeyMapping(String sourceName, String displayName, String rawKey, String rawMethod,
-                String modifiedKey, String modifiedMethod, String inputNameLine, String gamePadLine) {
-            this.sourceName = sourceName;
-            this.displayName = displayName;
-            this.rawKey = rawKey;
-            this.rawMethod = rawMethod;
-            this.modifiedKey = modifiedKey;
-            this.modifiedMethod = modifiedMethod;
-            this.inputNameLine = inputNameLine;
-            this.gamePadLine = gamePadLine;
-        }
-
-        public String getSourceName() {
-            return sourceName;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getRawKey() {
-            return rawKey;
-        }
-
-        public String getRawMethod() {
-            return rawMethod;
-        }
-
-        public String getModifiedKey() {
-            return modifiedKey;
-        }
-
-        public void setModifiedKey(String modifiedKey) {
-            this.modifiedKey = modifiedKey;
-        }
-
-        public String getModifiedMethod() {
-            return modifiedMethod;
-        }
-
-        public void setModifiedMethod(String modifiedMethod) {
-            this.modifiedMethod = modifiedMethod;
-        }
-
-        public String getInputNameLine() {
-            return inputNameLine;
-        }
-
-        public String getGamePadLine() {
-            return gamePadLine;
-        }
+    // ===================== 原有常量配置 =====================
+    private static final String DETECT_START_FLAG = "<!--程序开始检测标志-->";
+    private static final int CORNER_RADIUS = 12;
+    private static final Map<String, String> GAMEPAD_BUTTONS = new LinkedHashMap<>();
+    static {
+        GAMEPAD_BUTTONS.put("A", "buttonA");
+        GAMEPAD_BUTTONS.put("B", "buttonB");
+        GAMEPAD_BUTTONS.put("X", "buttonX");
+        GAMEPAD_BUTTONS.put("Y", "buttonY");
+        GAMEPAD_BUTTONS.put("LB", "buttonLB");
+        GAMEPAD_BUTTONS.put("RB", "buttonRB");
+        GAMEPAD_BUTTONS.put("LT", "buttonLT");
+        GAMEPAD_BUTTONS.put("RT", "buttonRT");
+        GAMEPAD_BUTTONS.put("LS", "buttonLS");
+        GAMEPAD_BUTTONS.put("RS", "buttonRS");
+        GAMEPAD_BUTTONS.put("padD", "padD");
+        GAMEPAD_BUTTONS.put("LB+A", "buttonLB buttonA");
+        GAMEPAD_BUTTONS.put("LB+B", "buttonLB buttonB");
+        GAMEPAD_BUTTONS.put("LB+X", "buttonLB buttonX");
+        GAMEPAD_BUTTONS.put("LB+Y", "buttonLB buttonY");
     }
 
-    private java.util.List<KeyMapping> fullDataList = new ArrayList<>();
-    private java.util.List<KeyMapping> filteredDataList = new ArrayList<>();
-    private Map<String, String> funcNameMap = new HashMap<>(); // key=源代码名称, value=多语言显示名
+    private static final Color BG_MAIN = new Color(30, 30, 46);
+    private static final Color BG_PANEL = new Color(37, 37, 56);
+    private static final Color BG_TABLE = new Color(45, 45, 66);
+    private static final Color BG_SELECTED = new Color(22, 93, 255);
+    private static final Color BG_BUTTON_NORMAL = new Color(54, 54, 80);
+    private static final Color BG_BUTTON_HOVER = new Color(64, 64, 96);
+    private static final Color TEXT_WHITE = new Color(255, 255, 255);
+    private static final Color TEXT_GRAY = new Color(180, 180, 180);
+    private static final Color BORDER_COLOR = new Color(60, 60, 85);
+
+    // ===================== 界面组件全局引用（用于切换语言刷新）=====================
+    private RoundedButton loadBtn, saveBtn, backupBtn, langBtn;
+    private RoundedList<String> moveList, battleList, skillList;
     private DefaultTableModel tableModel;
     private JTable table;
-    private JTextFieldHint searchField;
-    private Path sourceControlDir;
-    private Path sourceInputMapXml;
-    private Path csvDir;
-    private JTextArea xmlSourceArea;
-    private static final String I18N_BASE = "i18n.Messages";
-    private ResourceBundle resourceBundle;
-    private Locale currentLocale;
+    private TitledBorder leftPanelBorder, moveListBorder, battleListBorder, skillListBorder;
+    private JSplitPane mainSplitPane;
+    private RoundedPanel rightPanel;
 
-    // 模式切换与多语言TXT对照相关成员变量
-    private Set<String> txtSourceSet = new HashSet<>(); // 存储TXT内的源代码名称，用于简单模式过滤
-    private boolean isSimpleMode = false; // 当前是否为简单模式
-    private JButton simpleModeBtn; // 简单模式按钮
-    private JButton advancedModeBtn; // 高级模式按钮
-    // 新增：直接保存原文件按钮
-    private JButton saveDirectBtn;
+    // ===================== 原有成员变量 =====================
+    private Map<String, List<OpConfig>> opConfigMap = new HashMap<>();
+    private List<ButtonMapping> buttonList = new ArrayList<>();
+    private List<String> xmlLines = new ArrayList<>();
+    private Path xmlPath;
+    private Path currentTxtPath;
 
-    public App() {
-        currentLocale = Locale.CHINA;
-        try {
-            resourceBundle = getResourceBundle(currentLocale);
-        } catch (Exception e) {
-            System.err.println("多语言文件加载失败，使用默认提示: " + e.getMessage());
-            resourceBundle = null;
-        }
-        String projectRoot = System.getProperty("user.dir");
-        sourceControlDir = Paths.get(projectRoot, "Control_Remap");
-        sourceInputMapXml = sourceControlDir.resolve("files/0012/ui/inputmap.xml");
-        csvDir = Paths.get(projectRoot);
-        System.out.println("配置文件路径: " + sourceInputMapXml.toAbsolutePath());
-        System.out.println("对照文件目录: " + csvDir.toAbsolutePath());
-        loadCsvMapping(); // 初始化加载当前语言的对照文件
-        setTitle(getI18n("title", "键位配置工具 (Java 21)"));
-        setSize(1490, 960);
-        setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout(10, 10));
-    }
+    // ===================== 内部类 =====================
+    static class RoundedPanel extends JPanel {
+        private final int radius;
+        private final Color bgColor;
 
-    // 加载对应语言的对照文件（cn.txt/en.txt）+ 兼容原有CSV
-    private void loadCsvMapping() {
-        funcNameMap.clear();
-        txtSourceSet.clear(); // 切换语言时清空，重新加载
-        try {
-            // 原有CSV加载逻辑（兼容）
-            Files.walkFileTree(csvDir, new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    String fileName = file.getFileName().toString();
-                    if (fileName.endsWith(".csv")) {
-                        System.out.println("加载对照CSV: " + fileName);
-                        try (BufferedReader reader = new BufferedReader(
-                                new InputStreamReader(Files.newInputStream(file), StandardCharsets.UTF_8))) {
-                            String line;
-                            boolean isFirstLine = true;
-                            while ((line = reader.readLine()) != null) {
-                                line = line.trim();
-                                if (isFirstLine) {
-                                    isFirstLine = false;
-                                    continue;
-                                }
-                                if (line.isEmpty())
-                                    continue;
-                                String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-                                if (parts.length >= 2) {
-                                    String displayName = parts[0].replace("\"", "").trim();
-                                    String sourceName = parts[1].replace("\"", "").trim();
-                                    if (!sourceName.isEmpty() && !displayName.isEmpty()) {
-                                        funcNameMap.put(sourceName, displayName);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-
-            // 核心：根据当前语言加载cn.txt/en.txt（严格匹配文件名，支持等号前后有空格）
-            String txtFileName = currentLocale.equals(Locale.CHINA) ? "cn.txt" : "en.txt";
-            Path txtPath = csvDir.resolve(txtFileName);
-            if (Files.exists(txtPath)) {
-                System.out.println("成功加载对照TXT: " + txtFileName);
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(Files.newInputStream(txtPath), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        line = line.trim();
-                        if (line.isEmpty() || line.startsWith("["))
-                            continue; // 跳过空行/分组行
-                        String[] parts = line.split("=", 2); // 仅拆分第一个等号，兼容名称含等号
-                        if (parts.length >= 2) {
-                            String displayName = parts[0].trim(); // 英文/中文显示名
-                            String sourceName = parts[1].trim(); // 源代码名
-                            if (!sourceName.isEmpty() && !displayName.isEmpty()) {
-                                funcNameMap.put(sourceName, displayName); // TXT优先级高于CSV
-                                txtSourceSet.add(sourceName); // 加入简单模式过滤集合
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    JOptionPane.showMessageDialog(null,
-                            txtFileName + "加载失败: " + e.getMessage(),
-                            "错误", JOptionPane.ERROR_MESSAGE);
-                }
-            } else {
-                System.err.println("未找到对照TXT: " + txtFileName + "，将使用源代码名显示");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                    "对照文件加载失败: " + e.getMessage(),
-                    "错误", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private ResourceBundle getResourceBundle(Locale locale) throws IOException {
-        String language = locale.getLanguage();
-        String country = locale.getCountry();
-        StringBuilder bundleSuffix = new StringBuilder();
-        if (!language.isEmpty()) {
-            bundleSuffix.append("_").append(language);
-            if (!country.isEmpty())
-                bundleSuffix.append("_").append(country);
-        }
-        String resourcePath = I18N_BASE.replace(".", "/") + bundleSuffix + ".properties";
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
-            if (is == null) {
-                String defaultPath = I18N_BASE.replace(".", "/") + "_zh_CN.properties";
-                InputStream defaultIs = getClass().getClassLoader().getResourceAsStream(defaultPath);
-                if (defaultIs == null)
-                    throw new FileNotFoundException("多语言文件未找到: " + defaultPath);
-                return new PropertyResourceBundle(new InputStreamReader(defaultIs, StandardCharsets.UTF_8));
-            }
-            return new PropertyResourceBundle(new InputStreamReader(is, StandardCharsets.UTF_8));
-        }
-    }
-
-    public String getI18n(String key, String defaultValue) {
-        if (resourceBundle == null)
-            return defaultValue;
-        try {
-            return resourceBundle.getString(key);
-        } catch (MissingResourceException e) {
-            System.err.println("缺失多语言key: " + key);
-            return defaultValue;
-        }
-    }
-
-    // 核心修复：切换语言时重新加载配置，确保功能名实时切换为当前语言
-    private void switchLocale(Locale newLocale) {
-        try {
-            currentLocale = newLocale;
-            resourceBundle = getResourceBundle(newLocale);
-            loadCsvMapping(); // 加载新语言的对照文件
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "语言切换失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        // 更新界面文本
-        setTitle(getI18n("title", "Key Mapping Tool (Java 21)"));
-        String[] newColNames = currentLocale.equals(Locale.CHINA)
-                ? new String[] { "功能", "源代码名称", "原始键位", "原始触发方式", "修改键位", "修改触发方式" }
-                : new String[] { "Function", "Source Name", "Original Key", "Original Method", "Modify Key",
-                        "Modify Method" };
-        tableModel.setColumnIdentifiers(newColNames);
-
-        // 搜索栏组件文本更新
-        JPanel searchPanel = (JPanel) getContentPane().getComponent(0);
-        ((JLabel) searchPanel.getComponent(0))
-                .setText(currentLocale.equals(Locale.CHINA) ? "功能搜索：" : "Function Search:");
-        ((JTextFieldHint) searchPanel.getComponent(1)).setHintText(
-                currentLocale.equals(Locale.CHINA) ? "输入功能名，支持模糊搜索" : "Enter function name, fuzzy search supported");
-        ((JButton) searchPanel.getComponent(2)).setText(currentLocale.equals(Locale.CHINA) ? "搜索" : "Search");
-        ((JButton) searchPanel.getComponent(3)).setText(currentLocale.equals(Locale.CHINA) ? "重置搜索" : "Reset Search");
-        // 模式按钮文本更新
-        simpleModeBtn.setText(currentLocale.equals(Locale.CHINA) ? "简单模式" : "Simple Mode");
-        advancedModeBtn.setText(currentLocale.equals(Locale.CHINA) ? "高级模式" : "Advanced Mode");
-        // XML区域标题更新
-        JPanel xmlPanel = (JPanel) ((JSplitPane) getContentPane().getComponent(1)).getRightComponent();
-        xmlPanel.setBorder(
-                BorderFactory.createTitledBorder(currentLocale.equals(Locale.CHINA) ? "XML原始代码" : "XML Original Code"));
-        // 底部按钮文本更新
-        JPanel bottomPanel = (JPanel) getContentPane().getComponent(2);
-        Component[] buttons = bottomPanel.getComponents();
-        ((JButton) buttons[0]).setText(currentLocale.equals(Locale.CHINA) ? "读取配置文件" : "Load Config File");
-        ((JButton) buttons[1]).setText(currentLocale.equals(Locale.CHINA) ? "直接保存原文件" : "Save Directly"); // 新增按钮
-        ((JButton) buttons[2]).setText(currentLocale.equals(Locale.CHINA) ? "创建配置副本" : "Create Backup"); // 原保存按钮改名
-        ((JButton) buttons[3]).setText(currentLocale.equals(Locale.CHINA) ? "中文" : "Chinese");
-        ((JButton) buttons[4]).setText(currentLocale.equals(Locale.CHINA) ? "English" : "English");
-
-        // 【核心修复】如果已有配置数据，重新读取XML重建列表，确保功能名是新语言
-        if (!fullDataList.isEmpty()) {
-            loadConfigWithoutTip(); // 无提示重新加载配置
-        }
-
-        validate();
-        repaint();
-    }
-
-    private void createAndShowGUI() {
-        Font btnFont = new Font("微软雅黑", Font.PLAIN, 14);
-        // 搜索面板
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
-        searchPanel.setBorder(
-                BorderFactory.createTitledBorder(currentLocale.equals(Locale.CHINA) ? "功能搜索" : "Function Search"));
-        JLabel searchLabel = new JLabel(currentLocale.equals(Locale.CHINA) ? "功能搜索：" : "Function Search:");
-        searchLabel.setFont(new Font("微软雅黑", Font.PLAIN, 14));
-        searchField = new JTextFieldHint(35);
-        searchField.setFont(new Font("微软雅黑", Font.PLAIN, 14));
-        searchField.setHintText(
-                currentLocale.equals(Locale.CHINA) ? "输入功能名，支持模糊搜索" : "Enter function name, fuzzy search supported");
-        // 输入框实时过滤（无提示）
-        searchField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyReleased(KeyEvent e) {
-                filterData(false);
-            }
-        });
-
-        // 搜索按钮【取消提示】：调用filterData(false)
-        JButton searchBtn = new JButton(currentLocale.equals(Locale.CHINA) ? "搜索" : "Search");
-        searchBtn.setFont(btnFont);
-        searchBtn.setPreferredSize(new Dimension(100, 35));
-        searchBtn.addActionListener(e -> filterData(false));
-
-        // 重置搜索按钮（无提示，仅清空输入+过滤）
-        JButton resetBtn = new JButton(currentLocale.equals(Locale.CHINA) ? "重置搜索" : "Reset Search");
-        resetBtn.setFont(btnFont);
-        resetBtn.setPreferredSize(new Dimension(120, 35));
-        resetBtn.addActionListener(e -> {
-            searchField.setText("");
-            filterData(false);
-        });
-
-        // 简单/高级模式按钮【取消切换提示】：仅切换状态+过滤，无弹窗
-        simpleModeBtn = new JButton(currentLocale.equals(Locale.CHINA) ? "简单模式" : "Simple Mode");
-        advancedModeBtn = new JButton(currentLocale.equals(Locale.CHINA) ? "高级模式" : "Advanced Mode");
-        for (JButton btn : new JButton[] { simpleModeBtn, advancedModeBtn }) {
-            btn.setFont(btnFont);
-            btn.setPreferredSize(new Dimension(140, 35));
-        }
-        // 简单模式：仅切换状态+过滤，无弹窗
-        simpleModeBtn.addActionListener(e -> {
-            if (!isSimpleMode) {
-                isSimpleMode = true;
-                filterData(false);
-            }
-        });
-        // 高级模式：仅切换状态+过滤，无弹窗
-        advancedModeBtn.addActionListener(e -> {
-            if (isSimpleMode) {
-                isSimpleMode = false;
-                filterData(false);
-            }
-        });
-
-        // 组装搜索面板
-        searchPanel.add(searchLabel);
-        searchPanel.add(searchField);
-        searchPanel.add(searchBtn);
-        searchPanel.add(resetBtn);
-        searchPanel.add(simpleModeBtn);
-        searchPanel.add(advancedModeBtn);
-        add(searchPanel, BorderLayout.NORTH);
-
-        // 主分割面板（表格+XML）
-        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        mainSplitPane.setDividerLocation(1050);
-        mainSplitPane.setDividerSize(3);
-        // 表格面板
-        JPanel tablePanel = new JPanel(new BorderLayout());
-        String[] columnNames = currentLocale.equals(Locale.CHINA)
-                ? new String[] { "功能", "源代码名称", "原始键位", "原始触发方式", "修改键位", "修改触发方式" }
-                : new String[] { "Function", "Source Name", "Original Key", "Original Method", "Modify Key",
-                        "Modify Method" };
-        tableModel = new DefaultTableModel(columnNames, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return column >= 4;
-            }
-
-            @Override
-            public Class<?> getColumnClass(int columnIndex) {
-                return String.class;
-            }
-        };
-        table = new JTable(tableModel);
-        table.setFont(new Font("微软雅黑", Font.PLAIN, 13));
-        table.setRowHeight(26);
-        table.getTableHeader().setFont(new Font("微软雅黑", Font.BOLD, 14));
-        // 列宽配置
-        table.getColumnModel().getColumn(0).setPreferredWidth(180);
-        table.getColumnModel().getColumn(1).setPreferredWidth(200);
-        table.getColumnModel().getColumn(2).setPreferredWidth(100);
-        table.getColumnModel().getColumn(3).setPreferredWidth(120);
-        table.getColumnModel().getColumn(4).setPreferredWidth(100);
-        table.getColumnModel().getColumn(5).setPreferredWidth(120);
-        // 表格选中行，显示XML原始代码
-        table.getSelectionModel().addListSelectionListener(e -> {
-            int selectedRow = table.getSelectedRow();
-            if (selectedRow != -1 && selectedRow < filteredDataList.size()) {
-                KeyMapping km = filteredDataList.get(selectedRow);
-                xmlSourceArea.setText(km.getInputNameLine() + "\n" + km.getGamePadLine());
-            }
-        });
-        JScrollPane tableScroll = new JScrollPane(table);
-        tableScroll.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        tablePanel.add(tableScroll, BorderLayout.CENTER);
-        mainSplitPane.setLeftComponent(tablePanel);
-        // XML面板（修复双重边框）
-        JPanel xmlPanel = new JPanel(new BorderLayout(5, 5));
-        xmlPanel.setBorder(
-                BorderFactory.createTitledBorder(currentLocale.equals(Locale.CHINA) ? "XML原始代码" : "XML Original Code"));
-        xmlSourceArea = new JTextArea();
-        xmlSourceArea.setFont(new Font("Consolas", Font.PLAIN, 13));
-        xmlSourceArea.setLineWrap(true);
-        xmlSourceArea.setEditable(false);
-        JScrollPane xmlScroll = new JScrollPane(xmlSourceArea);
-        xmlPanel.add(xmlScroll, BorderLayout.CENTER);
-        mainSplitPane.setRightComponent(xmlPanel);
-        add(mainSplitPane, BorderLayout.CENTER);
-
-        // 底部按钮面板（新增直接保存按钮）
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
-        JButton loadBtn = new JButton(currentLocale.equals(Locale.CHINA) ? "读取配置文件" : "Load Config File");
-        // 新增：直接保存原文件按钮
-        saveDirectBtn = new JButton(currentLocale.equals(Locale.CHINA) ? "直接保存原文件" : "Save Directly");
-        // 原保存按钮改名：创建配置副本
-        JButton saveBackupBtn = new JButton(currentLocale.equals(Locale.CHINA) ? "创建配置副本" : "Create Backup");
-        JButton btnZh = new JButton(currentLocale.equals(Locale.CHINA) ? "中文" : "Chinese");
-        JButton btnEn = new JButton(currentLocale.equals(Locale.CHINA) ? "English" : "English");
-        // 统一按钮样式
-        for (JButton btn : new JButton[] { loadBtn, saveDirectBtn, saveBackupBtn, btnZh, btnEn }) {
-            btn.setFont(btnFont);
-            btn.setPreferredSize(new Dimension(160, 35));
-        }
-        // 读取配置【取消成功提示，保留错误提示】
-        loadBtn.addActionListener(e -> loadConfig());
-        // 新增：直接保存原文件按钮事件
-        saveDirectBtn.addActionListener(e -> saveDirectly());
-        // 原保存按钮：仅创建副本，不修改原文件
-        saveBackupBtn.addActionListener(e -> saveBackup());
-        // 语言切换
-        btnZh.addActionListener(e -> switchLocale(Locale.CHINA));
-        btnEn.addActionListener(e -> switchLocale(Locale.US));
-        // 组装底部按钮
-        bottomPanel.add(loadBtn);
-        bottomPanel.add(saveDirectBtn);
-        bottomPanel.add(saveBackupBtn);
-        bottomPanel.add(btnZh);
-        bottomPanel.add(btnEn);
-        add(bottomPanel, BorderLayout.SOUTH);
-
-        // 整体内边距
-        Border padding = BorderFactory.createEmptyBorder(10, 10, 10, 10);
-        ((JComponent) getContentPane()).setBorder(padding);
-        setVisible(true);
-    }
-
-    // 数据过滤：支持简单/高级模式+模糊搜索【无提示】
-    private void filterData(boolean showTip) {
-        filteredDataList.clear();
-        tableModel.setRowCount(0);
-        if (fullDataList.isEmpty())
-            return; // 无数据时直接返回，取消提示
-        String searchText = searchField.getText().toLowerCase().trim();
-        for (KeyMapping km : fullDataList) {
-            // 简单模式过滤：仅保留当前语言TXT中的配置项
-            if (isSimpleMode && !txtSourceSet.contains(km.getSourceName()))
-                continue;
-            // 模糊搜索：多语言显示名 + 源代码名
-            boolean isMatch = searchText.isEmpty()
-                    || km.getDisplayName().toLowerCase().contains(searchText)
-                    || km.getSourceName().toLowerCase().contains(searchText);
-            if (!isMatch)
-                continue;
-            filteredDataList.add(km);
-            // 表格渲染：直接用当前语言的displayName
-            tableModel.addRow(new Object[] {
-                    km.getDisplayName(),
-                    km.getSourceName(),
-                    km.getRawKey(),
-                    km.getRawMethod(),
-                    km.getModifiedKey(),
-                    km.getModifiedMethod()
-            });
-        }
-    }
-
-    // 读取配置文件【取消成功提示，保留文件不存在等错误提示】
-    private void loadConfig() {
-        // 检查文件夹/文件是否存在（保留错误提示）
-        if (!Files.exists(sourceControlDir)) {
-            JOptionPane.showMessageDialog(this,
-                    getI18n("folder_not_found", "未找到Control_Remap文件夹！\n路径：") + sourceControlDir.toAbsolutePath(),
-                    getI18n("error", "错误"), JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        if (!Files.exists(sourceInputMapXml)) {
-            JOptionPane.showMessageDialog(this,
-                    getI18n("xml_not_found", "未找到inputmap.xml！\n路径：") + sourceInputMapXml.toAbsolutePath(),
-                    getI18n("error", "错误"), JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        // 重新加载当前语言的对照文件（支持TXT修改后实时生效）
-        loadCsvMapping();
-        fullDataList.clear();
-        filteredDataList.clear();
-        tableModel.setRowCount(0);
-        xmlSourceArea.setText("");
-        System.out.println("开始解析inputmap.xml...");
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(skipBOM(Files.newInputStream(sourceInputMapXml)), StandardCharsets.UTF_8))) {
-            String lastInputLine = "";
-            String line;
-            int matchCount = 0;
-            while ((line = reader.readLine()) != null) {
-                String trimLine = line.trim();
-                if (trimLine.startsWith("<Input") && trimLine.contains("Name=")) {
-                    lastInputLine = line;
-                    continue;
-                }
-                if (trimLine.toLowerCase().contains("<gamepad") && !trimLine.startsWith("<!--")) {
-                    Matcher keyMatcher = Pattern.compile("Key=(['\"])(.*?)\\1", Pattern.CASE_INSENSITIVE)
-                            .matcher(trimLine);
-                    Matcher methodMatcher = Pattern.compile("Method=(['\"])(.*?)\\1", Pattern.CASE_INSENSITIVE)
-                            .matcher(trimLine);
-                    if (!keyMatcher.find() || !methodMatcher.find())
-                        continue;
-                    String sourceName = extractSourceName(lastInputLine);
-                    if (sourceName.isEmpty())
-                        continue;
-                    // 取当前语言的显示名，无则用源代码名
-                    String displayName = funcNameMap.getOrDefault(sourceName, sourceName);
-                    String rawKey = keyMatcher.group(2).trim();
-                    String rawMethod = methodMatcher.group(2).trim();
-                    // 新建KeyMapping（用displayName存储多语言名称）
-                    KeyMapping km = new KeyMapping(
-                            sourceName, displayName, rawKey, rawMethod,
-                            rawKey, rawMethod, lastInputLine, line);
-                    fullDataList.add(km);
-                    matchCount++;
-                }
-            }
-            filterData(false);
-            System.out.println("解析完成，共加载" + matchCount + "条键位配置");
-            // 取消读取成功的弹窗提示
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this,
-                    getI18n("load_failed", "读取失败：") + e.getMessage(),
-                    getI18n("error", "错误"), JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // 语言切换时专用：无提示重新加载配置（内部方法）
-    private void loadConfigWithoutTip() {
-        if (!Files.exists(sourceControlDir) || !Files.exists(sourceInputMapXml))
-            return;
-        loadCsvMapping();
-        fullDataList.clear();
-        filteredDataList.clear();
-        tableModel.setRowCount(0);
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(skipBOM(Files.newInputStream(sourceInputMapXml)), StandardCharsets.UTF_8))) {
-            String lastInputLine = "";
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String trimLine = line.trim();
-                if (trimLine.startsWith("<Input") && trimLine.contains("Name=")) {
-                    lastInputLine = line;
-                    continue;
-                }
-                if (trimLine.toLowerCase().contains("<gamepad") && !trimLine.startsWith("<!--")) {
-                    Matcher keyMatcher = Pattern.compile("Key=(['\"])(.*?)\\1", Pattern.CASE_INSENSITIVE)
-                            .matcher(trimLine);
-                    Matcher methodMatcher = Pattern.compile("Method=(['\"])(.*?)\\1", Pattern.CASE_INSENSITIVE)
-                            .matcher(trimLine);
-                    if (!keyMatcher.find() || !methodMatcher.find())
-                        continue;
-                    String sourceName = extractSourceName(lastInputLine);
-                    if (sourceName.isEmpty())
-                        continue;
-                    String displayName = funcNameMap.getOrDefault(sourceName, sourceName);
-                    String rawKey = keyMatcher.group(2).trim();
-                    String rawMethod = methodMatcher.group(2).trim();
-                    fullDataList.add(new KeyMapping(sourceName, displayName, rawKey, rawMethod, rawKey, rawMethod,
-                            lastInputLine, line));
-                }
-            }
-            filterData(false);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // 提取Input标签的Name值
-    private String extractSourceName(String inputLine) {
-        if (inputLine.isEmpty())
-            return "";
-        Matcher m = Pattern.compile("Name=(['\"])(.*?)\\1", Pattern.CASE_INSENSITIVE).matcher(inputLine);
-        return m.find() ? m.group(2).trim() : "";
-    }
-
-    // 跳过UTF-8 BOM头，兼容非标XML
-    private InputStream skipBOM(InputStream is) throws IOException {
-        if (!is.markSupported())
-            is = new BufferedInputStream(is);
-        is.mark(3);
-        byte[] bom = new byte[3];
-        if (is.read(bom) == 3 && bom[0] == (byte) 0xEF && bom[1] == (byte) 0xBB && bom[2] == (byte) 0xBF) {
-            System.out.println("跳过UTF-8 BOM头");
-            return is;
-        }
-        is.reset();
-        return is;
-    }
-
-    // 【修复+增强】直接保存原文件，自动备份原XML，永不损坏
-    private void saveDirectly() {
-        if (fullDataList.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    getI18n("load_first_tip", "请先读取配置文件！"),
-                    getI18n("tip", "提示"), JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
-        // 保存表格修改到内存
-        for (int i = 0; i < filteredDataList.size(); i++) {
-            KeyMapping km = filteredDataList.get(i);
-            String modKey = (String) tableModel.getValueAt(i, 4);
-            String modMethod = (String) tableModel.getValueAt(i, 5);
-            if (modKey != null && !modKey.trim().isEmpty())
-                km.setModifiedKey(modKey.trim());
-            if (modMethod != null && !modMethod.trim().isEmpty())
-                km.setModifiedMethod(modMethod.trim());
-        }
-
-        try {
-            // ✅ 安全机制：保存前自动备份原文件（inputmap.xml.bak），防止误操作损坏
-            Path backupXml = sourceInputMapXml.resolveSibling("inputmap.xml.bak");
-            Files.copy(sourceInputMapXml, backupXml, StandardCopyOption.REPLACE_EXISTING);
-
-            // ✅ 重写原文件（100%保留格式，无丢失）
-            rewriteInputMapXml(sourceInputMapXml);
-
-            JOptionPane.showMessageDialog(this,
-                    getI18n("save_direct_success", "原文件保存成功！\n原文件已自动备份为: inputmap.xml.bak") + "\n路径："
-                            + sourceInputMapXml.toAbsolutePath(),
-                    getI18n("success", "成功"), JOptionPane.INFORMATION_MESSAGE);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this,
-                    getI18n("save_direct_failed", "原文件保存失败：") + e.getMessage(),
-                    getI18n("error", "错误"), JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // ===================== 原保存方法改名：仅创建副本，不修改原文件 =====================
-    private void saveBackup() {
-        if (fullDataList.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    getI18n("load_first_tip", "请先读取配置文件！"),
-                    getI18n("tip", "提示"), JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        // 保存表格中的修改到内存
-        for (int i = 0; i < filteredDataList.size(); i++) {
-            KeyMapping km = filteredDataList.get(i);
-            String modKey = (String) tableModel.getValueAt(i, 4);
-            String modMethod = (String) tableModel.getValueAt(i, 5);
-            if (modKey != null && !modKey.trim().isEmpty())
-                km.setModifiedKey(modKey.trim());
-            if (modMethod != null && !modMethod.trim().isEmpty())
-                km.setModifiedMethod(modMethod.trim());
-        }
-        try {
-            Path myKeyBoardDir = Paths.get(System.getProperty("user.dir"), "My_KeyBoard");
-            Path targetDir = findNextDir(myKeyBoardDir, "Control_Remap_");
-            copyDirectory(sourceControlDir, targetDir); // 复制整个Control_Remap目录
-            Path targetXml = targetDir.resolve("files/0012/ui/inputmap.xml");
-            rewriteInputMapXml(targetXml); // 重写修改后的键位
-            // 保留保存成功提示
-            JOptionPane.showMessageDialog(this,
-                    getI18n("save_backup_success", "副本创建成功！\n路径：") + targetDir.toAbsolutePath(),
-                    getI18n("success", "成功"), JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception e) {
-            e.printStackTrace();
-            // 保留保存失败提示
-            JOptionPane.showMessageDialog(this,
-                    getI18n("save_backup_failed", "副本创建失败：") + e.getMessage(),
-                    getI18n("error", "错误"), JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // 【彻底修复】重写inputmap.xml，100%保留原文件格式/注释/空行，仅修改键位
-    private void rewriteInputMapXml(Path targetXml) throws IOException {
-        Map<String, KeyMapping> sourceToKmMap = new HashMap<>();
-        for (KeyMapping km : fullDataList) {
-            sourceToKmMap.put(km.getSourceName(), km);
-        }
-
-        // 关键：读取【完整的原始文件】（带BOM、注释、空行、所有内容）
-        List<String> allLines = Files.readAllLines(sourceInputMapXml, StandardCharsets.UTF_8);
-        String lastSourceName = "";
-
-        // 逐行处理，仅修改需要改的行，其余完全保留
-        for (int i = 0; i < allLines.size(); i++) {
-            String line = allLines.get(i);
-            String trimLine = line.trim();
-
-            // 匹配Input标签，记录当前源代码名
-            if (trimLine.startsWith("<Input") && trimLine.contains("Name=")) {
-                lastSourceName = extractSourceName(line);
-                continue;
-            }
-
-            // 匹配GamePad标签，且有对应修改配置 → 仅修改这一行
-            if (trimLine.toLowerCase().contains("<gamepad")
-                    && !trimLine.startsWith("<!--")
-                    && sourceToKmMap.containsKey(lastSourceName)) {
-
-                KeyMapping km = sourceToKmMap.get(lastSourceName);
-                // 安全替换Key和Method，不破坏行格式
-                line = line.replaceFirst("(Key|key)=([\"'])[^\"']*\\2", "Key=\"" + km.getModifiedKey() + "\"")
-                        .replaceFirst("(Method|method)=([\"'])[^\"']*\\2", "Method=\"" + km.getModifiedMethod() + "\"");
-
-                allLines.set(i, line);
-            }
-        }
-
-        // 【关键】完整写入所有行，1:1还原原文件格式，无任何内容丢失
-        Files.write(targetXml, allLines, StandardCharsets.UTF_8);
-    }
-
-    // 复制整个目录（保留原目录结构）
-    private void copyDirectory(Path source, Path target) throws IOException {
-        Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                Path targetDir = target.resolve(source.relativize(dir));
-                if (!Files.exists(targetDir))
-                    Files.createDirectories(targetDir);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                Files.copy(file, target.resolve(source.relativize(file)), StandardCopyOption.REPLACE_EXISTING);
-                return FileVisitResult.CONTINUE;
-            }
-        });
-    }
-
-    // 生成自增的副本目录（Control_Remap_1/2/3...）
-    private Path findNextDir(Path baseDir, String prefix) {
-        int i = 1;
-        while (true) {
-            Path candidate = baseDir.resolve(prefix + i);
-            if (!Files.exists(candidate))
-                return candidate;
-            i++;
-        }
-    }
-
-    // 主方法：Java 21兼容，UI线程调度
-    public static void main(String[] args) {
-        System.setProperty("sun.java2d.uiScale", "1.0");
-        SwingUtilities.invokeLater(() -> {
-            try {
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (Exception ignored) {
-            }
-            new App().createAndShowGUI();
-        });
-    }
-
-    // 带占位提示的输入框（原有逻辑保留）
-    static class JTextFieldHint extends JTextField {
-        private String hintText;
-
-        public JTextFieldHint(int columns) {
-            super(columns);
-        }
-
-        public void setHintText(String hintText) {
-            this.hintText = hintText;
-            repaint();
+        public RoundedPanel(int radius, Color bgColor) {
+            this.radius = radius;
+            this.bgColor = bgColor;
+            setOpaque(false);
         }
 
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (getText().isEmpty() && hintText != null && !isFocusOwner()) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setColor(Color.GRAY);
-                g2.setFont(getFont().deriveFont(Font.ITALIC));
-                FontMetrics fm = g2.getFontMetrics();
-                int y = getHeight() - fm.getDescent() - (getHeight() - fm.getHeight()) / 2;
-                g2.drawString(hintText, 5, y);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(bgColor);
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            g2.dispose();
+        }
+    }
+
+    static class RoundedList<T> extends JList<T> {
+        private final int radius;
+
+        public RoundedList(T[] data, int radius) {
+            super(data);
+            this.radius = radius;
+            setOpaque(false);
+            setBorder(new EmptyBorder(8, 12, 8, 12));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            super.paintComponent(g2);
+            g2.dispose();
+        }
+    }
+
+    static class RoundedScrollPane extends JScrollPane {
+        private final int radius;
+
+        public RoundedScrollPane(Component view, int radius, Color bgColor) {
+            super(view);
+            this.radius = radius;
+            setOpaque(false);
+            getViewport().setOpaque(false);
+            setBorder(new EmptyBorder(0, 0, 0, 0));
+            setViewportBorder(null);
+            getVerticalScrollBar().setUnitIncrement(16);
+            getVerticalScrollBar().setBackground(BG_MAIN);
+            getVerticalScrollBar().setPreferredSize(new Dimension(8, 0));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getViewport().getView().getBackground());
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            g2.dispose();
+        }
+    }
+
+    public static class OpConfig {
+        public String displayName;
+        public String sourceName;
+        public String method;
+        public String time;
+        public String rollValue;
+        public String releaseTime;
+
+        public OpConfig(String dn, String sn, String m, String t, String rv, String rt) {
+            displayName = dn;
+            sourceName = sn;
+            method = m;
+            time = t;
+            rollValue = rv;
+            releaseTime = rt;
+        }
+    }
+
+    public static class ButtonMapping {
+        public String displayName;
+        public String xmlKey;
+        public Set<String> ops = new LinkedHashSet<>();
+
+        public ButtonMapping(String dn, String xk) {
+            displayName = dn;
+            xmlKey = xk;
+        }
+    }
+
+    static class RoundedButton extends JButton {
+        private final int radius;
+
+        public RoundedButton(String text, int radius) {
+            super(text);
+            this.radius = radius;
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setBorderPainted(false);
+            setForeground(TEXT_WHITE);
+            setFont(new Font("微软雅黑", Font.PLAIN, 14));
+            setBackground(BG_BUTTON_NORMAL);
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    setBackground(BG_BUTTON_HOVER);
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    setBackground(BG_BUTTON_NORMAL);
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    setBackground(BG_SELECTED);
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    setBackground(BG_BUTTON_HOVER);
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            super.paintComponent(g2);
+            g2.dispose();
+        }
+    }
+
+    // ===================== 构造方法 =====================
+    public App() {
+        // 初始化文本资源
+        initTextResource();
+        // 初始化当前TXT路径
+        currentTxtPath = Paths.get(System.getProperty("user.dir"), TXT_PATH_CN);
+        // XML路径
+        xmlPath = Paths.get(System.getProperty("user.dir"), "Control_Remap", "files", "0012", "ui", "inputmap.xml");
+        // 初始化按键列表
+        for (Map.Entry<String, String> e : GAMEPAD_BUTTONS.entrySet()) {
+            buttonList.add(new ButtonMapping(e.getKey(), e.getValue()));
+        }
+        // 窗口配置
+        setTitle(getText("app_title"));
+        setSize(1280, 920);
+        setMinimumSize(new Dimension(1280, 920));
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout(12, 12));
+        getContentPane().setBackground(BG_MAIN);
+        ((JComponent) getContentPane()).setBorder(new EmptyBorder(12, 12, 12, 12));
+    }
+
+    // ===================== 文本资源初始化 =====================
+    private void initTextResource() {
+        // 中文文本
+        TEXT_CN.put("app_title", "红色沙漠 手柄键位配置工具");
+        TEXT_CN.put("btn_load", "读取配置文件");
+        TEXT_CN.put("btn_save", "直接保存原文件");
+        TEXT_CN.put("btn_backup", "创建配置文件副本");
+        TEXT_CN.put("btn_lang_en", "English");
+        TEXT_CN.put("btn_lang_cn", "中文");
+        TEXT_CN.put("title_mapping", "手柄按键映射");
+        TEXT_CN.put("title_move", "移动类");
+        TEXT_CN.put("title_battle", "战斗类");
+        TEXT_CN.put("title_skill", "技能类");
+        TEXT_CN.put("tip_no_bind", "暂无绑定操作，点击右侧操作后点+号添加");
+        TEXT_CN.put("btn_add", "+ 添加操作");
+        TEXT_CN.put("tip_select_op_first", "请先在右侧选择要添加的操作！");
+        TEXT_CN.put("tip_op_already_bind", "该按键已绑定此操作！");
+        TEXT_CN.put("tip_load_first", "请先读取配置文件！");
+        TEXT_CN.put("tip_no_detect_flag", "XML中未找到检测起始标志：" + DETECT_START_FLAG + "\n请先在XML中添加该标志！");
+        TEXT_CN.put("tip_source_folder_missing", "源文件夹Control_Remap不存在！");
+        TEXT_CN.put("error_txt_load", "TXT加载失败: ");
+        TEXT_CN.put("error_xml_load", "XML加载失败: ");
+        TEXT_CN.put("error_xml_save", "保存失败: ");
+        TEXT_CN.put("error_backup", "副本创建失败：");
+
+        // 英文文本
+        TEXT_EN.put("app_title", "Red Desert Gamepad Key Config Tool");
+        TEXT_EN.put("btn_load", "Load Config");
+        TEXT_EN.put("btn_save", "Save Original File");
+        TEXT_EN.put("btn_backup", "Create Config Backup");
+        TEXT_EN.put("btn_lang_en", "English");
+        TEXT_EN.put("btn_lang_cn", "中文");
+        TEXT_EN.put("title_mapping", "Gamepad Key Mapping");
+        TEXT_EN.put("title_move", "Movement");
+        TEXT_EN.put("title_battle", "Combat");
+        TEXT_EN.put("title_skill", "Skill");
+        TEXT_EN.put("tip_no_bind", "No bound operations, select an operation on the right and click + to add");
+        TEXT_EN.put("btn_add", "+ Add Operation");
+        TEXT_EN.put("tip_select_op_first", "Please select an operation on the right first!");
+        TEXT_EN.put("tip_op_already_bind", "This operation is already bound to this key!");
+        TEXT_EN.put("tip_load_first", "Please load the config file first!");
+        TEXT_EN.put("tip_no_detect_flag",
+                "Detection flag not found in XML: " + DETECT_START_FLAG + "\nPlease add this flag to your XML first!");
+        TEXT_EN.put("tip_source_folder_missing", "Source folder Control_Remap not found!");
+        TEXT_EN.put("error_txt_load", "TXT load failed: ");
+        TEXT_EN.put("error_xml_load", "XML load failed: ");
+        TEXT_EN.put("error_xml_save", "Save failed: ");
+        TEXT_EN.put("error_backup", "Backup create failed: ");
+    }
+
+    // 获取当前语言的文本
+    private String getText(String key) {
+        return isChinese ? TEXT_CN.getOrDefault(key, key) : TEXT_EN.getOrDefault(key, key);
+    }
+
+    // 获取当前语言的操作列表
+    private List<String> getCurrentMoveOps() {
+        return isChinese ? MOVE_OPS_CN : MOVE_OPS_EN;
+    }
+
+    private List<String> getCurrentBattleOps() {
+        return isChinese ? BATTLE_OPS_CN : BATTLE_OPS_EN;
+    }
+
+    private List<String> getCurrentSkillOps() {
+        return isChinese ? SKILL_OPS_CN : SKILL_OPS_EN;
+    }
+
+    // ===================== 核心功能方法 =====================
+    private int getDetectStartIndex() {
+        for (int i = 0; i < xmlLines.size(); i++) {
+            if (xmlLines.get(i).trim().equals(DETECT_START_FLAG)) {
+                System.out.println("找到检测起始标志，行号: " + (i + 1));
+                return i + 1;
             }
         }
+        return -1;
+    }
+
+    private void loadTxt() {
+        opConfigMap.clear();
+        System.out.println("========== 开始加载TXT ==========");
+        System.out.println("当前加载文件: " + currentTxtPath.getFileName());
+        try (BufferedReader r = new BufferedReader(
+                new InputStreamReader(Files.newInputStream(currentTxtPath), StandardCharsets.UTF_8))) {
+            String line;
+            Pattern p = Pattern.compile("^(.+?)=(.+?)<(.+?)>(?:\\((.*?)\\))?(?:\\[(.*?)\\])?(?:\\{(.*?)\\})?$");
+            while ((line = r.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("["))
+                    continue;
+                Matcher m = p.matcher(line);
+                if (m.find()) {
+                    String dn = m.group(1).trim();
+                    String sn = m.group(2).trim();
+                    String mt = m.group(3).trim();
+                    String t = m.group(4) != null ? m.group(4).trim() : "";
+                    String rv = m.group(5) != null ? m.group(5).trim() : "";
+                    String rt = m.group(6) != null ? m.group(6).trim() : "";
+                    OpConfig cfg = new OpConfig(dn, sn, mt, t, rv, rt);
+                    opConfigMap.computeIfAbsent(dn, k -> new ArrayList<>()).add(cfg);
+                    System.out.println("  加载: " + dn + " -> " + sn + " [" + mt + "]");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, getText("error_txt_load") + e.getMessage());
+        }
+        System.out.println("========== TXT加载完成，共" + opConfigMap.size() + "个操作 ==========");
+    }
+
+    private void loadXml() {
+        System.out.println("========== 开始加载XML ==========");
+        xmlLines.clear();
+        for (ButtonMapping b : buttonList)
+            b.ops.clear();
+        try {
+            if (Files.exists(xmlPath)) {
+                Path bak = xmlPath.resolveSibling("inputmap.xml.bak");
+                Files.copy(xmlPath, bak, StandardCopyOption.REPLACE_EXISTING);
+            }
+            xmlLines = Files.readAllLines(xmlPath, StandardCharsets.UTF_8);
+            System.out.println("  XML读取成功，共" + xmlLines.size() + "行");
+
+            int startIndex = getDetectStartIndex();
+            if (startIndex == -1) {
+                System.out.println("  警告：未找到检测起始标志，将解析整个XML");
+                startIndex = 0;
+            }
+
+            String currentSource = "";
+            Map<String, String> sourceToOp = new HashMap<>();
+            for (List<OpConfig> list : opConfigMap.values()) {
+                for (OpConfig cfg : list) {
+                    sourceToOp.put(cfg.sourceName, cfg.displayName);
+                }
+            }
+
+            Pattern inputP = Pattern.compile("<Input\\s+Name=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
+            Pattern gamePadP = Pattern.compile("<GamePad\\s+Key=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
+            Pattern inputEndP = Pattern.compile("</(Input)?>", Pattern.CASE_INSENSITIVE);
+
+            boolean inTargetInput = false;
+            for (int i = startIndex; i < xmlLines.size(); i++) {
+                String line = xmlLines.get(i);
+                String trim = line.trim();
+                if (trim.startsWith("<!--"))
+                    continue;
+
+                Matcher m1 = inputP.matcher(trim);
+                if (m1.find()) {
+                    String sourceName = m1.group(1).trim();
+                    if (sourceToOp.containsKey(sourceName)) {
+                        currentSource = sourceName;
+                        inTargetInput = true;
+                    } else {
+                        currentSource = "";
+                        inTargetInput = false;
+                    }
+                    continue;
+                }
+
+                Matcher endMatcher = inputEndP.matcher(trim);
+                if (endMatcher.find()) {
+                    currentSource = "";
+                    inTargetInput = false;
+                    continue;
+                }
+
+                if (inTargetInput && !currentSource.isEmpty()) {
+                    Matcher m2 = gamePadP.matcher(trim);
+                    if (m2.find()) {
+                        String key = m2.group(1).trim();
+                        String opName = sourceToOp.get(currentSource);
+                        if (opName != null) {
+                            for (ButtonMapping b : buttonList) {
+                                if (b.xmlKey.equalsIgnoreCase(key)) {
+                                    b.ops.add(opName);
+                                    System.out.println("  绑定: " + b.displayName + " -> " + opName + " (节点: "
+                                            + currentSource + ")");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, getText("error_xml_load") + e.getMessage());
+        }
+        System.out.println("========== XML加载完成 ==========");
+        refreshTable();
+    }
+
+    private void saveXml() {
+        System.out.println("========== 开始保存XML ==========");
+        try {
+            Files.write(xmlPath, xmlLines, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
+            System.out.println("  XML保存成功！共" + xmlLines.size() + "行");
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, getText("error_xml_save") + e.getMessage());
+        }
+    }
+
+    private void copyDirectory(Path sourceDir, Path targetDir) throws IOException {
+        if (!Files.exists(sourceDir) || !Files.isDirectory(sourceDir)) {
+            throw new IOException("源文件夹不存在或不是目录: " + sourceDir);
+        }
+        Files.createDirectories(targetDir);
+        try (Stream<Path> stream = Files.list(sourceDir)) {
+            stream.forEach(sourcePath -> {
+                try {
+                    Path targetPath = targetDir.resolve(sourcePath.getFileName());
+                    if (Files.isDirectory(sourcePath)) {
+                        copyDirectory(sourcePath, targetPath);
+                    } else {
+                        Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING,
+                                StandardCopyOption.COPY_ATTRIBUTES);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException("复制文件失败: " + sourcePath, e);
+                }
+            });
+        }
+    }
+
+    private void addOperation(ButtonMapping button, String opName) {
+        System.out.println("========== 开始添加操作 ==========");
+        System.out.println("  目标按键: " + button.displayName + " (XML: " + button.xmlKey + ")");
+        System.out.println("  目标操作: " + opName);
+
+        List<OpConfig> configs = opConfigMap.get(opName);
+        if (configs == null || configs.isEmpty()) {
+            System.out.println("  错误：未找到操作[" + opName + "]的配置！");
+            return;
+        }
+
+        int startIndex = getDetectStartIndex();
+        if (startIndex == -1) {
+            JOptionPane.showMessageDialog(this, getText("tip_no_detect_flag"));
+            return;
+        }
+
+        List<String> newXmlLines = new ArrayList<>(xmlLines);
+
+        for (OpConfig cfg : configs) {
+            System.out.println("  处理源码节点: " + cfg.sourceName);
+
+            int inputStartLine = -1;
+            int inputEndLine = -1;
+            String indent = "\t\t";
+            boolean keyExists = false;
+            boolean isSelfClosed = false;
+
+            Pattern inputStartPattern = Pattern.compile(
+                    "^\\s*<Input\\s+Name=\"" + Pattern.quote(cfg.sourceName) + "\"(\\s+[^>]*)?(/?)>\\s*$",
+                    Pattern.CASE_INSENSITIVE);
+            Pattern keyMatchPattern = Pattern.compile(
+                    "^\\s*<GamePad\\s+[^>]*Key=\"" + Pattern.quote(button.xmlKey) + "\"(\\s+[^>]*)?/>\\s*$",
+                    Pattern.CASE_INSENSITIVE);
+            Pattern inputEndPattern = Pattern.compile(
+                    "^\\s*</(Input)?>\\s*$",
+                    Pattern.CASE_INSENSITIVE);
+
+            for (int i = startIndex; i < newXmlLines.size(); i++) {
+                String line = newXmlLines.get(i);
+                String trim = line.trim();
+                if (trim.startsWith("<!--"))
+                    continue;
+
+                if (inputStartLine == -1) {
+                    Matcher startMatcher = inputStartPattern.matcher(line);
+                    if (startMatcher.find()) {
+                        inputStartLine = i;
+                        isSelfClosed = "/".equals(startMatcher.group(2));
+                        System.out.println("    [1/5] 找到目标Input起始，行号: " + (i + 1) + " | 内容: " + trim);
+                        System.out.println("    是否自闭合: " + isSelfClosed);
+                    }
+                    continue;
+                }
+
+                Matcher endMatcher = inputEndPattern.matcher(line);
+                if (endMatcher.find()) {
+                    inputEndLine = i;
+                    indent = line.replaceAll("</.*?>", "");
+                    System.out.println("    [2/5] 找到目标Input结束，行号: " + (i + 1) + " | 结束标签: " + trim);
+                    break;
+                }
+
+                if (isSelfClosed && i == inputStartLine) {
+                    inputEndLine = i;
+                    System.out.println("    [2/5] 自闭合标签，结束行: " + (i + 1));
+                    break;
+                }
+
+                Matcher keyMatcher = keyMatchPattern.matcher(line);
+                if (keyMatcher.find()) {
+                    keyExists = true;
+                    System.out.println("    [3/5] 检测到已存在的按键行，行号: " + (i + 1) + " | 内容: " + trim);
+                    break;
+                }
+            }
+
+            if (inputStartLine == -1) {
+                System.out.println("    [跳过] 未找到目标Input节点，跳过");
+                continue;
+            }
+            if (keyExists) {
+                System.out.println("    [跳过] 该按键已存在于此节点，跳过");
+                continue;
+            }
+            if (inputEndLine == -1 && !isSelfClosed) {
+                System.out.println("    [警告] 未找到目标Input的结束行，跳过");
+                continue;
+            }
+
+            System.out.println("    [4/5] 准备插入按键");
+            if (isSelfClosed) {
+                System.out.println("      转换自闭合标签为可插入格式");
+                String startLine = newXmlLines.get(inputStartLine);
+                String newStartLine = startLine.replaceAll("/>\\s*$", ">");
+                newXmlLines.set(inputStartLine, newStartLine);
+                newXmlLines.add(inputStartLine + 1, indent + "</>");
+                inputEndLine = inputStartLine + 1;
+            }
+
+            StringBuilder insertLine = new StringBuilder();
+            insertLine.append(indent).append("<GamePad Key=\"").append(button.xmlKey).append("\" Method=\"")
+                    .append(cfg.method).append("\"");
+            if (!cfg.time.isEmpty())
+                insertLine.append(" Time=\"").append(cfg.time).append("\"");
+            if (!cfg.rollValue.isEmpty())
+                insertLine.append(" RollTriggerValue=\"").append(cfg.rollValue).append("\"");
+            if (!cfg.releaseTime.isEmpty())
+                insertLine.append(" ReleaseTime=\"").append(cfg.releaseTime).append("\"");
+            insertLine.append("/>");
+
+            System.out.println("      插入行: " + insertLine);
+            newXmlLines.add(inputStartLine + 1, insertLine.toString());
+            System.out.println("    [5/5] 插入成功！");
+        }
+
+        xmlLines = newXmlLines;
+        System.out.println("========== 操作添加完成！ ==========");
+    }
+
+    private void removeOperation(ButtonMapping button, String opName) {
+        System.out.println("========== 开始删除操作 ==========");
+        System.out.println("  目标按键: " + button.displayName + " (XML: " + button.xmlKey + ")");
+        System.out.println("  目标操作: " + opName);
+
+        List<OpConfig> configs = opConfigMap.get(opName);
+        if (configs == null || configs.isEmpty()) {
+            System.out.println("  错误：未找到操作[" + opName + "]的配置！");
+            return;
+        }
+
+        int startIndex = getDetectStartIndex();
+        if (startIndex == -1) {
+            JOptionPane.showMessageDialog(this, getText("tip_no_detect_flag"));
+            return;
+        }
+
+        List<String> newXmlLines = new ArrayList<>(xmlLines);
+
+        for (OpConfig cfg : configs) {
+            System.out.println("  处理源码节点: " + cfg.sourceName);
+
+            int inputStartLine = -1;
+            int inputEndLine = -1;
+            boolean isSelfClosed = false;
+
+            Pattern inputStartPattern = Pattern.compile(
+                    "^\\s*<Input\\s+Name=\"" + Pattern.quote(cfg.sourceName) + "\"(\\s+[^>]*)?(/?)>\\s*$",
+                    Pattern.CASE_INSENSITIVE);
+            Pattern keyMatchPattern = Pattern.compile(
+                    "^\\s*<GamePad\\s+[^>]*Key=\"" + Pattern.quote(button.xmlKey) + "\"(\\s+[^>]*)?/>\\s*$",
+                    Pattern.CASE_INSENSITIVE);
+            Pattern inputEndPattern = Pattern.compile(
+                    "^\\s*</(Input)?>\\s*$",
+                    Pattern.CASE_INSENSITIVE);
+
+            for (int i = startIndex; i < newXmlLines.size(); i++) {
+                String line = newXmlLines.get(i);
+                String trim = line.trim();
+                if (trim.startsWith("<!--"))
+                    continue;
+
+                if (inputStartLine == -1) {
+                    Matcher startMatcher = inputStartPattern.matcher(line);
+                    if (startMatcher.find()) {
+                        inputStartLine = i;
+                        isSelfClosed = "/".equals(startMatcher.group(2));
+                        System.out.println("    [1/4] 找到目标Input起始，行号: " + (i + 1) + " | 内容: " + trim);
+                        System.out.println("    是否自闭合: " + isSelfClosed);
+                    }
+                    continue;
+                }
+
+                Matcher endMatcher = inputEndPattern.matcher(line);
+                if (endMatcher.find()) {
+                    inputEndLine = i;
+                    System.out.println("    [2/4] 找到目标Input结束，行号: " + (i + 1) + " | 结束标签: " + trim);
+                    break;
+                }
+
+                if (isSelfClosed && i == inputStartLine) {
+                    inputEndLine = i;
+                    System.out.println("    [2/4] 自闭合标签，无内容可删除，跳过");
+                    break;
+                }
+            }
+
+            if (inputStartLine == -1) {
+                System.out.println("    [跳过] 未找到目标Input节点，跳过");
+                continue;
+            }
+            if (isSelfClosed) {
+                System.out.println("    [跳过] 自闭合标签，无GamePad行可删除");
+                continue;
+            }
+            if (inputEndLine == -1) {
+                System.out.println("    [警告] 未找到目标Input的结束行，跳过");
+                continue;
+            }
+
+            System.out.println("    [3/4] 开始扫描目标节点，范围: 行" + (inputStartLine + 1) + " ~ 行" + (inputEndLine + 1));
+            List<String> tempLines = new ArrayList<>();
+            int deleteCount = 0;
+
+            for (int i = 0; i < newXmlLines.size(); i++) {
+                String line = newXmlLines.get(i);
+                String trim = line.trim();
+
+                if (i < inputStartLine || i > inputEndLine) {
+                    tempLines.add(line);
+                    continue;
+                }
+
+                if (trim.startsWith("<!--")) {
+                    tempLines.add(line);
+                    continue;
+                }
+
+                Matcher keyMatcher = keyMatchPattern.matcher(line);
+                if (keyMatcher.find()) {
+                    System.out.println("    [删除成功] 行号: " + (i + 1) + " | 内容: " + trim);
+                    deleteCount++;
+                    continue;
+                }
+
+                tempLines.add(line);
+            }
+
+            newXmlLines = tempLines;
+            System.out.println("    [4/4] 节点处理完成，共删除 " + deleteCount + " 行");
+        }
+
+        xmlLines = newXmlLines;
+        System.out.println("========== 删除操作完成！ ==========");
+    }
+
+    // ===================== 语言切换核心方法 =====================
+    private void switchLanguage() {
+        // 切换语言标记
+        isChinese = !isChinese;
+        // 更新TXT路径
+        currentTxtPath = Paths.get(System.getProperty("user.dir"), isChinese ? TXT_PATH_CN : TXT_PATH_EN);
+        // 重新加载TXT和XML
+        loadTxt();
+        loadXml();
+        // 刷新界面所有文字
+        refreshUI();
+        System.out.println("========== 语言切换完成，当前语言: " + (isChinese ? "中文" : "英文") + " ==========");
+    }
+
+    // 刷新界面所有组件文字
+    private void refreshUI() {
+        // 窗口标题
+        setTitle(getText("app_title"));
+        // 按钮文字
+        loadBtn.setText(getText("btn_load"));
+        saveBtn.setText(getText("btn_save"));
+        backupBtn.setText(getText("btn_backup"));
+        langBtn.setText(isChinese ? getText("btn_lang_en") : getText("btn_lang_cn"));
+        // 边框标题
+        leftPanelBorder.setTitle(getText("title_mapping"));
+        moveListBorder.setTitle(getText("title_move"));
+        battleListBorder.setTitle(getText("title_battle"));
+        skillListBorder.setTitle(getText("title_skill"));
+        // 操作列表刷新
+        refreshOperationList();
+        // 表格刷新
+        refreshTable();
+        // 重绘界面
+        SwingUtilities.updateComponentTreeUI(this);
+    }
+
+    // 刷新操作列表
+    private void refreshOperationList() {
+        // 清除原有选中监听
+        for (ListSelectionListener l : moveList.getListSelectionListeners()) {
+            moveList.removeListSelectionListener(l);
+        }
+        for (ListSelectionListener l : battleList.getListSelectionListeners()) {
+            battleList.removeListSelectionListener(l);
+        }
+        for (ListSelectionListener l : skillList.getListSelectionListeners()) {
+            skillList.removeListSelectionListener(l);
+        }
+        // 更新列表数据
+        moveList.setListData(getCurrentMoveOps().toArray(new String[0]));
+        battleList.setListData(getCurrentBattleOps().toArray(new String[0]));
+        skillList.setListData(getCurrentSkillOps().toArray(new String[0]));
+        // 重新添加互斥选中监听
+        ListSelectionListener mutualExclusionListener = e -> {
+            if (e.getValueIsAdjusting())
+                return;
+            JList<?> source = (JList<?>) e.getSource();
+            if (source.isSelectionEmpty())
+                return;
+            if (source == moveList) {
+                battleList.clearSelection();
+                skillList.clearSelection();
+            } else if (source == battleList) {
+                moveList.clearSelection();
+                skillList.clearSelection();
+            } else if (source == skillList) {
+                moveList.clearSelection();
+                battleList.clearSelection();
+            }
+        };
+        moveList.addListSelectionListener(mutualExclusionListener);
+        battleList.addListSelectionListener(mutualExclusionListener);
+        skillList.addListSelectionListener(mutualExclusionListener);
+    }
+
+    private void refreshTable() {
+        tableModel.setRowCount(0);
+        for (ButtonMapping b : buttonList) {
+            tableModel.addRow(new Object[] { b.displayName, b });
+        }
+        for (int i = 0; i < table.getRowCount(); i++) {
+            int h = 40;
+            Component c = table.prepareRenderer(table.getCellRenderer(i, 1), i, 1);
+            h = Math.max(h, c.getPreferredSize().height + 10);
+            table.setRowHeight(i, h);
+        }
+    }
+
+    private String getSelectedOp() {
+        if (!moveList.isSelectionEmpty())
+            return moveList.getSelectedValue();
+        if (!battleList.isSelectionEmpty())
+            return battleList.getSelectedValue();
+        if (!skillList.isSelectionEmpty())
+            return skillList.getSelectedValue();
+        return null;
+    }
+
+    // ===================== 渲染器和编辑器 =====================
+    class OpCellRenderer extends RoundedPanel implements TableCellRenderer {
+        public OpCellRenderer() {
+            super(CORNER_RADIUS - 4, BG_TABLE);
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+            setBorder(new EmptyBorder(5, 5, 5, 5));
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+                int row, int column) {
+            removeAll();
+            if (value instanceof ButtonMapping b) {
+                if (b.ops.isEmpty()) {
+                    JLabel l = new JLabel(getText("tip_no_bind"));
+                    l.setForeground(TEXT_GRAY);
+                    l.setFont(new Font("微软雅黑", Font.PLAIN, 13));
+                    add(l);
+                } else {
+                    for (String op : b.ops) {
+                        JPanel opRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 3));
+                        opRow.setOpaque(false);
+                        opRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+                        RoundedButton delBtn = new RoundedButton("-", 4);
+                        delBtn.setPreferredSize(new Dimension(25, 22));
+                        delBtn.setFont(new Font("微软雅黑", Font.BOLD, 12));
+                        opRow.add(delBtn);
+                        JLabel opLabel = new JLabel(op);
+                        opLabel.setForeground(TEXT_WHITE);
+                        opLabel.setFont(new Font("微软雅黑", Font.PLAIN, 13));
+                        opRow.add(opLabel);
+                        add(opRow);
+                    }
+                }
+                JPanel addRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 3));
+                addRow.setOpaque(false);
+                addRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+                RoundedButton addBtn = new RoundedButton(getText("btn_add"), 4);
+                addBtn.setPreferredSize(new Dimension(120, 26));
+                addBtn.setFont(new Font("微软雅黑", Font.PLAIN, 12));
+                addRow.add(addBtn);
+                add(addRow);
+            }
+            return this;
+        }
+    }
+
+    class OpCellEditor extends AbstractCellEditor implements TableCellEditor {
+        private final OpCellRenderer renderer = new OpCellRenderer();
+        private ButtonMapping currentButton;
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row,
+                int column) {
+            currentButton = (ButtonMapping) value;
+            renderer.getTableCellRendererComponent(table, value, isSelected, true, row, column);
+
+            for (Component comp : renderer.getComponents()) {
+                if (comp instanceof JPanel opRow) {
+                    for (Component inner : opRow.getComponents()) {
+                        if (inner instanceof RoundedButton btn) {
+                            for (ActionListener al : btn.getActionListeners()) {
+                                btn.removeActionListener(al);
+                            }
+                            if (btn.getText().equals("-")) {
+                                JLabel opLabel = (JLabel) opRow.getComponent(1);
+                                String opName = opLabel.getText();
+                                btn.addActionListener(e -> {
+                                    removeOperation(currentButton, opName);
+                                    currentButton.ops.remove(opName);
+                                    refreshTable();
+                                    fireEditingStopped();
+                                });
+                            } else if (btn.getText().contains("+")) {
+                                btn.addActionListener(e -> {
+                                    String selOp = getSelectedOp();
+                                    if (selOp == null) {
+                                        JOptionPane.showMessageDialog(table, getText("tip_select_op_first"));
+                                        fireEditingStopped();
+                                        return;
+                                    }
+                                    if (currentButton.ops.contains(selOp)) {
+                                        JOptionPane.showMessageDialog(table, getText("tip_op_already_bind"));
+                                        fireEditingStopped();
+                                        return;
+                                    }
+                                    addOperation(currentButton, selOp);
+                                    currentButton.ops.add(selOp);
+                                    refreshTable();
+                                    fireEditingStopped();
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            return renderer;
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            return currentButton;
+        }
+    }
+
+    // ===================== UI创建 =====================
+    private void createUI() {
+        // 顶部按钮栏
+        RoundedPanel topPanel = new RoundedPanel(CORNER_RADIUS, BG_PANEL);
+        topPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 20, 10));
+        topPanel.setBorder(new EmptyBorder(8, 10, 8, 10));
+
+        // 初始化按钮
+        loadBtn = new RoundedButton(getText("btn_load"), CORNER_RADIUS - 4);
+        saveBtn = new RoundedButton(getText("btn_save"), CORNER_RADIUS - 4);
+        backupBtn = new RoundedButton(getText("btn_backup"), CORNER_RADIUS - 4);
+        langBtn = new RoundedButton(getText("btn_lang_en"), CORNER_RADIUS - 4);
+        saveBtn.setBackground(BG_SELECTED);
+        langBtn.setBackground(new Color(80, 80, 120));
+
+        for (RoundedButton btn : new RoundedButton[] { loadBtn, saveBtn, backupBtn, langBtn }) {
+            btn.setPreferredSize(new Dimension(180, 40));
+            topPanel.add(btn);
+        }
+        add(topPanel, BorderLayout.NORTH);
+
+        // 主分割面板
+        mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        mainSplitPane.setDividerLocation(800);
+        mainSplitPane.setDividerSize(2);
+        mainSplitPane.setBackground(BG_MAIN);
+        mainSplitPane.setBorder(null);
+        mainSplitPane.setResizeWeight(0.65);
+
+        // 左侧映射面板
+        RoundedPanel leftPanel = new RoundedPanel(CORNER_RADIUS, BG_PANEL);
+        leftPanel.setLayout(new BorderLayout());
+        leftPanelBorder = BorderFactory.createTitledBorder(
+                BorderFactory.createEmptyBorder(),
+                getText("title_mapping"),
+                TitledBorder.LEFT,
+                TitledBorder.TOP,
+                new Font("微软雅黑", Font.BOLD, 14),
+                TEXT_WHITE);
+        leftPanel.setBorder(leftPanelBorder);
+        ((TitledBorder) leftPanel.getBorder()).setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        // 表格
+        String[] columnNames = isChinese ? new String[] { "手柄按键", "映射操作列表" }
+                : new String[] { "Gamepad Key", "Bound Operations" };
+        tableModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 1;
+            }
+
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return columnIndex == 1 ? ButtonMapping.class : String.class;
+            }
+        };
+
+        table = new JTable(tableModel);
+        table.setBackground(BG_TABLE);
+        table.setForeground(TEXT_WHITE);
+        table.setGridColor(BORDER_COLOR);
+        table.setFont(new Font("微软雅黑", Font.PLAIN, 14));
+        table.setSelectionBackground(BG_SELECTED);
+        table.setSelectionForeground(TEXT_WHITE);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 5));
+        table.setRowMargin(5);
+        table.getTableHeader().setBackground(BG_PANEL);
+        table.getTableHeader().setForeground(TEXT_WHITE);
+        table.getTableHeader().setFont(new Font("微软雅黑", Font.BOLD, 14));
+        table.getTableHeader().setReorderingAllowed(false);
+        table.getTableHeader().setResizingAllowed(false);
+        table.getColumnModel().getColumn(0).setPreferredWidth(100);
+        table.getColumnModel().getColumn(1).setPreferredWidth(700);
+        table.getColumnModel().getColumn(1).setCellRenderer(new OpCellRenderer());
+        table.getColumnModel().getColumn(1).setCellEditor(new OpCellEditor());
+
+        RoundedScrollPane tableScroll = new RoundedScrollPane(table, CORNER_RADIUS - 4, BG_TABLE);
+        tableScroll.setBorder(new EmptyBorder(10, 10, 10, 10));
+        leftPanel.add(tableScroll, BorderLayout.CENTER);
+        mainSplitPane.setLeftComponent(leftPanel);
+
+        // 右侧操作面板
+        rightPanel = new RoundedPanel(CORNER_RADIUS, BG_PANEL);
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
+
+        // 操作列表初始化
+        moveList = createOperationList(getCurrentMoveOps(), getText("title_move"));
+        battleList = createOperationList(getCurrentBattleOps(), getText("title_battle"));
+        skillList = createOperationList(getCurrentSkillOps(), getText("title_skill"));
+
+        // 保存边框引用，用于切换语言刷新
+        moveListBorder = (TitledBorder) moveList.getBorder();
+        battleListBorder = (TitledBorder) battleList.getBorder();
+        skillListBorder = (TitledBorder) skillList.getBorder();
+
+        // 互斥选中监听
+        ListSelectionListener mutualExclusionListener = e -> {
+            if (e.getValueIsAdjusting())
+                return;
+            JList<?> source = (JList<?>) e.getSource();
+            if (source.isSelectionEmpty())
+                return;
+            if (source == moveList) {
+                battleList.clearSelection();
+                skillList.clearSelection();
+            } else if (source == battleList) {
+                moveList.clearSelection();
+                skillList.clearSelection();
+            } else if (source == skillList) {
+                moveList.clearSelection();
+                battleList.clearSelection();
+            }
+        };
+        moveList.addListSelectionListener(mutualExclusionListener);
+        battleList.addListSelectionListener(mutualExclusionListener);
+        skillList.addListSelectionListener(mutualExclusionListener);
+
+        rightPanel.add(moveList);
+        rightPanel.add(Box.createVerticalStrut(20));
+        rightPanel.add(battleList);
+        rightPanel.add(Box.createVerticalStrut(20));
+        rightPanel.add(skillList);
+        rightPanel.add(Box.createVerticalGlue());
+
+        RoundedScrollPane rightScroll = new RoundedScrollPane(rightPanel, CORNER_RADIUS, BG_PANEL);
+        rightScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        mainSplitPane.setRightComponent(rightScroll);
+
+        add(mainSplitPane, BorderLayout.CENTER);
+
+        // 按钮事件绑定
+        loadBtn.addActionListener(e -> {
+            loadTxt();
+            loadXml();
+        });
+        saveBtn.addActionListener(e -> {
+            if (xmlLines.isEmpty())
+                JOptionPane.showMessageDialog(this, getText("tip_load_first"));
+            else
+                saveXml();
+        });
+        backupBtn.addActionListener(e -> {
+            if (xmlLines.isEmpty()) {
+                JOptionPane.showMessageDialog(this, getText("tip_load_first"));
+                return;
+            }
+            try {
+                String root = System.getProperty("user.dir");
+                Path sourceRoot = Paths.get(root, "Control_Remap");
+                if (!Files.exists(sourceRoot) || !Files.isDirectory(sourceRoot)) {
+                    JOptionPane.showMessageDialog(this, getText("tip_source_folder_missing"));
+                    return;
+                }
+                Path myKeyBoardDir = Paths.get(root, "My_KeyBoard");
+                if (!Files.exists(myKeyBoardDir)) {
+                    Files.createDirectories(myKeyBoardDir);
+                }
+                int i = 1;
+                Path targetDir;
+                while (true) {
+                    targetDir = myKeyBoardDir.resolve("Control_Remap_" + i);
+                    if (!Files.exists(targetDir))
+                        break;
+                    i++;
+                }
+                copyDirectory(sourceRoot, targetDir);
+                System.out.println("========== 配置副本创建完成 ==========");
+                System.out.println("  副本路径: " + targetDir.toAbsolutePath());
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, getText("error_backup") + ex.getMessage());
+            }
+        });
+        // 语言切换按钮事件
+        langBtn.addActionListener(e -> switchLanguage());
+
+        setVisible(true);
+    }
+
+    private RoundedList<String> createOperationList(List<String> operations, String title) {
+        RoundedList<String> list = new RoundedList<>(operations.toArray(new String[0]), CORNER_RADIUS - 4);
+        list.setBackground(BG_TABLE);
+        list.setForeground(TEXT_WHITE);
+        list.setFont(new Font("微软雅黑", Font.PLAIN, 14));
+        list.setFixedCellHeight(36);
+        list.setSelectionBackground(BG_SELECTED);
+        list.setSelectionForeground(TEXT_WHITE);
+        TitledBorder border = BorderFactory.createTitledBorder(
+                BorderFactory.createEmptyBorder(),
+                title,
+                TitledBorder.LEFT,
+                TitledBorder.TOP,
+                new Font("微软雅黑", Font.BOLD, 14),
+                TEXT_WHITE);
+        list.setBorder(border);
+        ((TitledBorder) list.getBorder()).setBorder(new EmptyBorder(8, 8, 8, 8));
+        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        list.setMinimumSize(new Dimension(300, operations.size() * 36 + 50));
+        list.setPreferredSize(new Dimension(300, operations.size() * 36 + 50));
+        list.setMaximumSize(new Dimension(Integer.MAX_VALUE, operations.size() * 36 + 50));
+        return list;
+    }
+
+    // ===================== 主方法 =====================
+    public static void main(String[] args) {
+        System.setProperty("sun.java2d.uiScale", "1.0");
+        SwingUtilities.invokeLater(() -> new App().createUI());
     }
 }
