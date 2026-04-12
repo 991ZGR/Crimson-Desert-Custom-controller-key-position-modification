@@ -1,4 +1,4 @@
-This module requires the use of JSON Manager v9.8.3
+This module requires the use of JSON Manager v9.8.3+
 
 This version only provides some operations that can be modified, but it greatly simplifies the operation
 How to use:
