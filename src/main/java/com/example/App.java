@@ -64,7 +64,7 @@ import java.awt.event.MouseEvent;
 
 public class App extends JFrame {
     // ===================== 语言配置核心 =====================
-    private boolean isChinese = true; // 默认中文
+    private boolean isChinese = false; // 默认英文
     // 中文TXT路径
     private final String TXT_PATH_CN = "cn_same_name_method _partial.txt";
     // 英文TXT路径
@@ -278,15 +278,16 @@ public class App extends JFrame {
     public App() {
         // 初始化文本资源
         initTextResource();
-        // 初始化当前TXT路径
-        currentTxtPath = Paths.get(System.getProperty("user.dir"), TXT_PATH_CN);
-        // XML路径
-        xmlPath = Paths.get(System.getProperty("user.dir"), "Control_Remap", "files", "0012", "ui", "inputmap.xml");
-        // 初始化按键列表
+        // 读取exe所在同级目录的文件，和依赖文件完全匹配
+        String exeRootPath = System.getProperty("user.dir");
+        // 两个多语言TXT文件，直接读exe同级目录
+        currentTxtPath = Paths.get(exeRootPath, isChinese ? TXT_PATH_CN : TXT_PATH_EN);
+        // Control_Remap文件夹，直接读exe同级目录
+        xmlPath = Paths.get(exeRootPath, "Control_Remap", "files", "0012", "ui", "inputmap.xml");
+
         for (Map.Entry<String, String> e : GAMEPAD_BUTTONS.entrySet()) {
             buttonList.add(new ButtonMapping(e.getKey(), e.getValue()));
         }
-        // 窗口配置
         setTitle(getText("app_title"));
         setSize(1280, 920);
         setMinimumSize(new Dimension(1280, 920));
@@ -304,8 +305,8 @@ public class App extends JFrame {
         TEXT_CN.put("btn_load", "读取配置文件");
         TEXT_CN.put("btn_save", "直接保存原文件");
         TEXT_CN.put("btn_backup", "创建配置文件副本");
-        TEXT_CN.put("btn_lang_en", "English");
-        TEXT_CN.put("btn_lang_cn", "中文");
+        TEXT_CN.put("btn_lang_en", "Change Language");
+        TEXT_CN.put("btn_lang_cn", "Change Language");
         TEXT_CN.put("title_mapping", "手柄按键映射");
         TEXT_CN.put("title_move", "移动类");
         TEXT_CN.put("title_battle", "战斗类");
@@ -327,8 +328,8 @@ public class App extends JFrame {
         TEXT_EN.put("btn_load", "Load Config");
         TEXT_EN.put("btn_save", "Save Original File");
         TEXT_EN.put("btn_backup", "Create Config Backup");
-        TEXT_EN.put("btn_lang_en", "English");
-        TEXT_EN.put("btn_lang_cn", "中文");
+        TEXT_EN.put("btn_lang_en", "Change Language");
+        TEXT_EN.put("btn_lang_cn", "Change Language");
         TEXT_EN.put("title_mapping", "Gamepad Key Mapping");
         TEXT_EN.put("title_move", "Movement");
         TEXT_EN.put("title_battle", "Combat");

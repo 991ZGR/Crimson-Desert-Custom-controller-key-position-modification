@@ -2,43 +2,31 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <!-- 1. 模型版本 (Maven 要求必须放在第一行) -->
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.example</groupId>
-    <artifactId>key-mapper</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
 
+    <!-- 2. 项目基础坐标 (你的项目身份证，这三个必须填) -->
+    <groupId>com.example</groupId>          <!-- 包名，对应你的代码 package -->
+    <artifactId>RedDesertKeyConfig</artifactId> <!-- 项目名 -->
+    <version>1.0.0</version>                <!-- 版本号 -->
+    <packaging>jar</packaging>               <!-- 打包方式 -->
+
+    <!-- 3. 属性配置 (指定 JDK 版本为 21) -->
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>21</maven.compiler.release>
-        <maven-shade-plugin.version>3.5.1</maven-shade-plugin.version>
-        <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
-        <java.version>21</java.version>
     </properties>
 
+    <!-- 4. 构建配置 (这部分是之前给你的内容) -->
     <build>
-        <finalName>key-mapper</finalName>
         <plugins>
-            <!-- 编译插件：强制Java21 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
-                <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
-                    <encoding>UTF-8</encoding>
-                    <release>${java.version}</release>
-                </configuration>
-            </plugin>
-
-            <!-- 打可执行JAR插件（包含所有依赖，独立运行） -->
+            <!-- 插件 1: 生成带主类的可执行 JAR -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>${maven-shade-plugin.version}</version>
+                <version>3.5.1</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -46,42 +34,31 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <!-- 指定主类 -->
+                                    <!-- 【关键】指定你的主类，确保包名和类名完全正确 -->
                                     <mainClass>com.example.App</mainClass>
+                                    <!-- 补充元数据，减少误报 -->
+                                    <manifestEntries>
+                                        <Built-By>YourNexusName</Built-By>
+                                        <Implementation-Title>RedDesertKeyConfig</Implementation-Title>
+                                        <Implementation-Version>1.0.0</Implementation-Version>
+                                        <Implementation-Vendor>YourName</Implementation-Vendor>
+                                    </manifestEntries>
                                 </transformer>
                             </transformers>
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
+                            <!-- 输出文件名 -->
+                            <outputFile>${project.build.directory}/${project.artifactId}-v${project.version}.jar</outputFile>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- JAR插件：辅助配置 -->
+            <!-- 插件 2: 清理临时文件 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>${maven-jar-plugin.version}</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <addClasspath>true</addClasspath>
-                            <mainClass>com.example.App</mainClass>
-                            <classpathPrefix>lib/</classpathPrefix>
-                        </manifest>
-                    </archive>
-                </configuration>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>3.3.2</version>
             </plugin>
         </plugins>
     </build>
